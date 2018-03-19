@@ -18,3 +18,7 @@ bigdigits/
 
 # macOS garbage.
 .DS_Store
+
+# Binaries
+server
+sensor
