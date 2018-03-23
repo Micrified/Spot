@@ -55,3 +55,8 @@ func (h Heap) Len() int {
 func (h Heap) Cap() int {
 	return cap(h)
 }
+
+// Returns true if the heap is empty.
+func (h Heap) IsEmpty() bool {
+	return len(h) <= 0
+}

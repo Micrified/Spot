@@ -5,12 +5,12 @@ import "errors"
 type Queue []interface{}
 
 // Append item to queue.
-func (q *Queue) Enqueue (x interface{}) {
+func (q *Queue) Enqueue(x interface{}) {
 	*q = append(*q, x)
 }
 
 // Return next item in the queue.
-func (q *Queue) Dequeue () (interface{}, error) {
+func (q *Queue) Dequeue() (interface{}, error) {
 	theQueue := *q
 	if len(theQueue) <= 0 {
 		return nil, errors.New("Can't dequeue() from empty queue!")
@@ -18,6 +18,14 @@ func (q *Queue) Dequeue () (interface{}, error) {
 	x := theQueue[0]
 	*q = theQueue[1:]
 	return x, nil
+}
+
+// Returns the top item in the queue.
+func (q Queue) Peek() (interface{}, error) {
+	if len(q) <= 0 {
+		return nil, errors.New("Can't peek() from empty queue!")
+	}
+	return q[0], nil
 }
 
 // Returns length of the queue.

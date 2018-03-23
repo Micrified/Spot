@@ -4,6 +4,12 @@ import (
 	"time"
 	"errors"
 	"math"
+	"queue"
+	"random"
+)
+
+const (
+	AMP_THRESHOLD	= 10
 )
 
 // An atomic sensor data packet.
@@ -19,13 +25,37 @@ func (g Gram) Compare(x Gram) bool {
 	return g.When.Before(x.When)
 }
 
+// Returns the coordinates of a Gram.
+func (g Gram) Origin() (float64, float64) {
+	return g.Location[0], g.Location[1]
+}
+
 // Generates a Gram.
 func Generate() Gram {
-	i := 8;
-	t := time.Now().AddDate(0, -1, 0)
-	l := []float64{64.0, 22.0}
-	s := []int{9,0,1,1,4,5,6,3,2,1,1,0,0}
+	i := 8
+	t := time.Now()
+	l := []float64{1.5, 2.5}
+	s := []int{0,0,1,2,3,8,10,8,3,2,1,0,0}
 	return Gram{i, t, l, s}
+}
+
+// Generates a random Gram within a certain zone.
+func Random(a Area) Gram {
+	i := random.RandomId(46)
+	t := random.RandomTime(20)
+	x, y := random.RandomLocation(a.X, a.Y, a.Width, a.Height)
+	s := random.RandomSignal(10)
+	return Gram{i, t, []float64{x,y}, s}
+}
+
+// Returns true if a gram is interesting.
+func IsInteresting (g Gram) bool {
+	for a := range g.Signal {
+		if a > AMP_THRESHOLD {
+			return true
+		}
+	}
+	return false
 }
 
 // A zone descriptor.
@@ -60,4 +90,10 @@ func ZoneDimensions (a Area, z Zone) (int, int, error) {
 
 	return int(w), int(h), nil
 }
+
+type Event struct {
+	Queue *queue.Queue
+}
+
+
 
