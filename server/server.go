@@ -1,165 +1,204 @@
-package main
+package main 
 
 import (
-	"fmt"
-	"net"
-	"log"
-	"encoding/json"
-	"queue"
-	"server/heap"
-	"data"
-	"time"
-	"config"
+    "fmt"
+    "net"
+    "log"
+    "encoding/json"
+    "queue"
+    "data"
 )
 
-// Server connection information.
+/* 
+ ******************************************************************************
+ *                                  Constants
+ ******************************************************************************
+*/
+
 const (
-	CONN_HOST 			= "localhost"
-	CONN_PORT 			= "8024"
-	CONN_TYPE 			= "tcp"
+    DEFAULT_NET_HOST    = "localhost"
+    DEFAULT_NET_PORT    = "8024"
+    DEFAULT_NET_TYPE    = "tcp"
+    DEFAULT_BUF_SIZE    = 1024
 )
 
-var Time_Threshold int
-var Sensor_Threshold int
+/* 
+ ******************************************************************************
+ *                                   Globals
+ ******************************************************************************
+*/
 
-// Handles incoming requests.
-func handleRequest (conn net.Conn, h *heap.Heap) {
+// Data Gram Lifetime. 
+var Threshold_Time int
 
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
+// Minimum amount of sensors required to trigger an event.
+var Threshold_Sensor int
 
-	// Read incoming connection into the buffer.
-	read_len, err := conn.Read(buf)
-	if err != nil {
-		log.Fatal("Error reading: ", err.Error())
-	}
+// Radius of association.
+var Threshold_Radius float64
 
-	// Deserialize the datagram and print it.
-	var gram data.Gram
-	err = json.Unmarshal(buf[:read_len], &gram)
+/* 
+ ******************************************************************************
+ *                             Utility Routines
+ ******************************************************************************
+*/
 
-	if err != nil {
-		log.Fatal("Error deserializing: ", err.Error())
-	}
 
-	// Push datagram on heap.
-	h.Push(gram)
 
-	// Print the current heap.
-	h.Print()
+/* 
+ ******************************************************************************
+ *                                Goroutines
+ ******************************************************************************
+*/
 
-	// Close the connection when you're done with it.
-	conn.Close()
+// Handler for incoming connections to the server. 
+func requestHandler (conn net.Conn, in chan data.Gram) {
+    fmt.Println("RequestHandler :: Launched for new connection!")
+    // Initialize data buffer.
+    buf := make([]byte, DEFAULT_BUF_SIZE)
 
-	// Update the heap.
-	processHeap(h)
+    // Copy bytes to buffer.
+    count, err := conn.Read(buf)
+    if err != nil {
+        log.Fatal("Connection Error: ", err.Error())
+    }
+
+    // Close connection.
+    conn.Close()
+
+    // Deserialize JSON to data.Gram.
+    var g data.Gram
+    if err = json.Unmarshal(buf[:count], &g); err != nil {
+        log.Fatal("Deserialization Error: ", err.Error())
+    }
+
+    // If datagram is important, send to cluster queue.
+    if data.IsInteresting(g) {
+        fmt.Println("• Gram is interesting.")
+        in <- g
+    } else {
+        fmt.Println("• Gram discarded.")
+    }
 }
 
-// Processes the heap.
-func processHeap (h *heap.Heap) {
-	for !h.IsEmpty() {
-		g := h.Pop().(data.Gram)
-		if data.IsInteresting(g) {
-			x, y := g.Origin()
-			i, j, err := data.ZoneIndex(x, y, area, zone)
-			if err != nil {
-				log.Fatal("Can't place gram: ", err.Error())
-			}
-			q := &queues[i][j]
-			q.Enqueue(g)
-			processQueue(q, i, j)
-		}
-	}
+// Handler for incoming data grams.
+func queueHandler (in chan data.Gram, out chan data.Cluster) {
+    var q queue.Queue
+    fmt.Println("QueueHandler :: Active and listening!")
+    for {
+
+        // Accept data gram.
+        g := <- in
+
+        fmt.Println("QueueHandler :: Accepted new Gram!")
+
+
+        
+        // Remove expired events.
+        fmt.Println("• Removing Expired Clusters")
+        var survivors []interface{}
+        for _, c := range q {
+            k := c.(data.Cluster)
+            if !k.Expired(Threshold_Time) {
+                k.Update(Threshold_Time)
+                survivors = append(survivors, k)
+            }
+        }
+        q = survivors
+        fmt.Printf("• %d clusters survived!\n", len(q))
+
+        // Try to find suitable cluster for gram.
+        fmt.Println("• Searching for suitable cluster...")
+        matched := false
+        for i, c := range q {
+            k := c.(data.Cluster)
+            if k.Suits(g, Threshold_Radius) {
+                k.Insert(g)
+                matched = true
+                q[i] = k
+                break
+            }
+        }
+        if !matched {
+            fmt.Println("• No matches -> Installing new cluster!")
+            var c data.Cluster
+            c.Insert(g)
+            fmt.Println("• Cluster after insertion: ", c)
+            q.Enqueue(c)
+        }
+
+        // Create events for important clusters.
+        for _, c := range q {
+            k := c.(data.Cluster)
+            if len(k.Members) >= Threshold_Sensor {
+                out <- k
+            }
+        }
+    }
 }
 
-// Returns true if a given gram is out of date.
-func expired (g data.Gram) bool {
-	cutoff := time.Now().Add(-time.Second * time.Duration(Time_Threshold))
-	return cutoff.After(g.When)
+// Handler for incoming events (important/flagged clusters)
+func eventHandler (in chan data.Cluster) {
+    fmt.Println("EventHandler :: Active and listening!")
+    for {
+
+        // Accept important cluster.
+        c := <- in
+
+        fmt.Println("EventHandler: Important Event = ", c)
+
+        // (Later) Try to synchronize with other servers.
+
+        // Take something from queue. 
+
+        // (Later) Resychronize again. 
+    }
 }
 
-// Processes a data queue. 
-func processQueue (q *queue.Queue, i, j int) {
-
-	// Flush old data.
-	for !q.IsEmpty() {
-		g, _ := q.Peek()
-		if !expired(g.(data.Gram)) {
-			break
-		}
-		q.Dequeue()
-	}
-
-	// Generate new event.
-	if q.Len() >= Sensor_Threshold {
-		fmt.Println("There is an important event in zone (", i, ",", j,")")
-	} else {
-		fmt.Println("Nothing important in zone (", i, ",", j, ")")
-	}
-}
-
-// Globals
-var area data.Area
-var zone data.Zone
-var queues [][]queue.Queue
+/* 
+ ******************************************************************************
+ *                                  Main
+ ******************************************************************************
+*/
 
 func main () {
 
-	// Attempt to read configuration file.
-	f, err := config.OpenFileStream("config.json")
-	if err != nil {
-		log.Fatal("Couldn't find config: ", err.Error())
-	}
-	c, err := config.ReadConfig(f)
-	if err != nil {
-		log.Fatal("Bad config file: ", err.Error())
-	}
-	Time_Threshold = c.Time_Threshold
-	Sensor_Threshold = c.Sensor_Threshold
-	area = c.Area()
-	zone = c.Zone()
-	
-	// Compute Grid Dimensions.
-	rows, columns, err := data.ZoneDimensions(area, zone)
+    // Set server settings [hardcoded].
+    Threshold_Time      = 60        // Seconds
+    Threshold_Sensor    = 3         // Count
+    Threshold_Radius    = 1.0       // Kilometers.
 
-	if err != nil {
-		log.Fatal("Bad grid initialization: ", err.Error())
-	}
+    // Display Initialization Message:
+    fmt.Printf("Initialized.\n- Time Threshold: %d\n- Server Threshold: %d\n- Trigger Radius: %f\n", Threshold_Time, Threshold_Sensor, Threshold_Radius)
 
-	// Initialize Queues.
-	queues = make([][]queue.Queue, rows)
+    // Listen for incoming connections.
+    socket, err := net.Listen(DEFAULT_NET_TYPE, DEFAULT_NET_HOST + ":" + DEFAULT_NET_PORT)
+    if err != nil {
+        log.Fatal("Error starting socket: ", err.Error())
+    }
+    // Initialize Inter-Routine Channels.
+    gramChannel := make(chan data.Gram)
+    clusterChannel := make(chan data.Cluster)
 
-	for i := 0; i < rows; i++ {
-		queues[i] = make([]queue.Queue, columns)
-	}
+    // Launch queue handler.
+    go queueHandler(gramChannel, clusterChannel)
 
-	// Display Initialization Message.
-	fmt.Println("Ready -> Listening on a (", rows, "x", columns, ") zoned grid.")
-	
-	// Initialize the heap.
-	h := &heap.Heap{}
-	h.Init()
+    // Launch event handler.
+    go eventHandler(clusterChannel)
 
-	// Listen for incoming connections.
-	l, err := net.Listen(CONN_TYPE, CONN_HOST + ":" + CONN_PORT)
+    // Close listener when application closes.
+    defer socket.Close()
 
-	if err != nil {
-		log.Fatal("Error listening: ", err.Error())
-	}
+    // Wait for connections. 
+    for {
 
-	// 2. Close listener when application closes.
-	defer l.Close();
+        // Accept connection.
+        conn, err := socket.Accept()
+        if err != nil {
+            log.Fatal("Socket Error: ", err.Error())
+        }
 
-	fmt.Println("Listening on " + CONN_HOST + ":" + CONN_PORT);
-
-	for {
-		// Listen for incoming connection.
-		conn, err := l.Accept()
-		if err != nil {
-			log.Fatal("Error accepting: ", err.Error())
-		}
-
-		// Handle connections in a new goroutine.
-		go handleRequest(conn, h)
-	}
+        // Launch request handler.
+        go requestHandler(conn, gramChannel)
+    }
 }

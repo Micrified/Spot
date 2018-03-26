@@ -2,10 +2,8 @@ package data
 
 import (
 	"time"
-	"errors"
 	"math"
-	"queue"
-	"random"
+	"fmt"
 )
 
 const (
@@ -30,22 +28,12 @@ func (g Gram) Origin() (float64, float64) {
 	return g.Location[0], g.Location[1]
 }
 
-// Generates a Gram.
-func Generate() Gram {
-	i := 8
-	t := time.Now()
-	l := []float64{1.5, 2.5}
-	s := []int{0,0,1,2,3,8,10,8,3,2,1,0,0}
-	return Gram{i, t, l, s}
-}
-
-// Generates a random Gram within a certain zone.
-func Random(a Area) Gram {
-	i := random.RandomId(46)
-	t := random.RandomTime(20)
-	x, y := random.RandomLocation(a.X, a.Y, a.Width, a.Height)
-	s := random.RandomSignal(10)
-	return Gram{i, t, []float64{x,y}, s}
+// Returns true if a given gram is within a radius of another gram.
+func (g Gram) Nearby(x Gram, r float64) bool {
+	dx := g.Location[0] - x.Location[0]
+	dy := g.Location[1] - x.Location[1]
+	fmt.Printf("• Sensor %d picked up a signal within %f kilometers of sensor %d!\n", g.Id, math.Sqrt(dx * dx + dy * dy), x.Id)
+	return (r * r >= dx * dx + dy * dy)
 }
 
 // Returns true if a gram is interesting.
@@ -58,42 +46,41 @@ func IsInteresting (g Gram) bool {
 	return false
 }
 
-// A zone descriptor.
-type Zone struct {
-	Width, Height float64
+type Cluster struct {
+	Updated time.Time
+	Members []Gram
 }
 
-// An area descriptor.
-type Area struct {
-	X, Y, Width, Height float64
-}
-
-// Returns an (i,j) index-pair for a given coordinate over an area divided into zones described by type Zone.
-func ZoneIndex (x, y float64, a Area, z Zone) (int, int, error) {
-	if (x < a.X) || (x > a.X + a.Width) {
-		return 0, 0, errors.New("x coordinate not in area bounds!")
+func (c *Cluster) Insert(g Gram) {
+	c.Members = append(c.Members, g)
+	if g.When.After(c.Updated) {
+		c.Updated = g.When
 	}
-	if (y < a.Y) || (y > a.Y + a.Height) {
-		return 0, 0, errors.New("y coordinate not in area bounds!")
+}
+
+func (c *Cluster) Update(threshold int) {
+	cutoff := time.Now().Add(-time.Second * time.Duration(threshold))
+	var survivors []Gram
+	for _, g := range c.Members {
+		if g.When.After(cutoff) {
+			survivors = append(survivors, g)
+		}
 	}
-	return (int(x - a.X) / int(z.Width)), int(y - a.Y) / int(z.Height), nil
+	c.Members = survivors
 }
 
-// Returns the amount of integer zones to allocate for a given area and zone description.
-func ZoneDimensions (a Area, z Zone) (int, int, error) {
-	w := math.Ceil(a.Width / z.Width)
-	h := math.Ceil(a.Height / z.Height)
-	
-	if (w < 1.0) || (h < 1.0) {
-		return 0, 0, errors.New("Can't subdivide area by given zone!")
+func (c Cluster) Expired(threshold int) bool {
+	cutoff := time.Now().Add(-time.Second * time.Duration(threshold))
+	return cutoff.After(c.Updated)
+}
+
+func (c Cluster) Suits(g Gram, r float64) bool {
+	//fmt.Println("• Members has length: ", len(c.Members))
+	for _, other := range c.Members {
+		//fmt.Println("• Comparing: ", g, " to ", other)
+		if g.Nearby(other, r) {
+			return true
+		}
 	}
-
-	return int(w), int(h), nil
+	return false
 }
-
-type Event struct {
-	Queue *queue.Queue
-}
-
-
-
