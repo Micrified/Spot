@@ -4,11 +4,18 @@ import (
 	"time"
 	"math"
 	"fmt"
+	"encoding/json"
 )
 
 const (
 	AMP_THRESHOLD	= 10
 )
+
+/* 
+ ******************************************************************************
+ *                                  Gram
+ ******************************************************************************
+*/
 
 // An atomic sensor data packet.
 type Gram struct {
@@ -23,12 +30,7 @@ func (g Gram) Compare(x Gram) bool {
 	return g.When.Before(x.When)
 }
 
-// Returns the coordinates of a Gram.
-func (g Gram) Origin() (float64, float64) {
-	return g.Location[0], g.Location[1]
-}
-
-// Returns true if a given gram is within a radius of another gram.
+// Returns true if given Gram is within certain radius of another.
 func (g Gram) Nearby(x Gram, r float64) bool {
 	dx := g.Location[0] - x.Location[0]
 	dy := g.Location[1] - x.Location[1]
@@ -36,7 +38,7 @@ func (g Gram) Nearby(x Gram, r float64) bool {
 	return (r * r >= dx * dx + dy * dy)
 }
 
-// Returns true if a gram is interesting.
+// Returns true if the given Gram has a signal with amplitude of interest.
 func IsInteresting (g Gram) bool {
 	for a := range g.Signal {
 		if a > AMP_THRESHOLD {
@@ -46,11 +48,28 @@ func IsInteresting (g Gram) bool {
 	return false
 }
 
+/* 
+ ******************************************************************************
+ *                                  Cluster
+ ******************************************************************************
+*/
+
+// A Gram clustering type.
 type Cluster struct {
 	Updated time.Time
 	Members []Gram
 }
 
+// Serializes a Cluster into a JSON byte buffer.
+func (c Cluster) Bytes() ([]byte, error) {
+	json, err := json.Marshal(c)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(json), nil
+}
+
+// Inserts a Gram into a Cluster.
 func (c *Cluster) Insert(g Gram) {
 	c.Members = append(c.Members, g)
 	if g.When.After(c.Updated) {
@@ -58,6 +77,7 @@ func (c *Cluster) Insert(g Gram) {
 	}
 }
 
+// Purges all expired Grams from the given Cluster.
 func (c *Cluster) Update(threshold int) {
 	cutoff := time.Now().Add(-time.Second * time.Duration(threshold))
 	var survivors []Gram
@@ -69,15 +89,15 @@ func (c *Cluster) Update(threshold int) {
 	c.Members = survivors
 }
 
+// Determines if the Cluster has expired (last added Gram expired).
 func (c Cluster) Expired(threshold int) bool {
 	cutoff := time.Now().Add(-time.Second * time.Duration(threshold))
 	return cutoff.After(c.Updated)
 }
 
+// Returns true if the given Gram belongs in the Cluster.
 func (c Cluster) Suits(g Gram, r float64) bool {
-	//fmt.Println("• Members has length: ", len(c.Members))
 	for _, other := range c.Members {
-		//fmt.Println("• Comparing: ", g, " to ", other)
 		if g.Nearby(other, r) {
 			return true
 		}

@@ -7,6 +7,7 @@ import (
     "encoding/json"
     "queue"
     "data"
+    "github.com/streadway/amqp"
 )
 
 /* 
@@ -92,8 +93,6 @@ func queueHandler (in chan data.Gram, out chan data.Cluster) {
 
         fmt.Println("QueueHandler :: Accepted new Gram!")
 
-
-        
         // Remove expired events.
         fmt.Println("• Removing Expired Clusters")
         var survivors []interface{}
@@ -139,19 +138,67 @@ func queueHandler (in chan data.Gram, out chan data.Cluster) {
 
 // Handler for incoming events (important/flagged clusters)
 func eventHandler (in chan data.Cluster) {
-    fmt.Println("EventHandler :: Active and listening!")
+    fmt.Println("EventHandler :: Starting up ...")
+
+    // Open connection to message exchange.
+    conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
+    if err != nil {
+        log.Fatal("Error: Failed to connect to exchange: ", err.Error())
+    }
+
+    // Open input channel.
+    ch, err := conn.Channel()
+    if err != nil {
+        log.Fatal("Error: Failed to open channel with connection object: ", err.Error())
+    }
+
+    // Deferred clean-up.
+    defer func() {
+        ch.Close()
+        conn.Close()
+    }()
+
+    // Declare a fanout exchange. Anonymous channels.
+    err = ch.ExchangeDeclare(
+        "events",               // Exchange Name.
+        "fanout",               // Exchange Type.
+        true,                   // Durable (resistance to crashing)
+        false,                  // Auto-deleted.
+        false,                  // Internal.
+        false,                  // No-wait.
+        nil,                    // Arguments.
+    )
+    if err != nil {
+        log.Fatal("Error: Failed to declare an exchange: ", err.Error())
+    }
+
     for {
 
         // Accept important cluster.
         c := <- in
-
         fmt.Println("EventHandler: Important Event = ", c)
 
-        // (Later) Try to synchronize with other servers.
+        // Export to exchange.
+        bytes, err := c.Bytes()
 
-        // Take something from queue. 
+        if err != nil {
+            log.Fatal("Error: Failed to serialize cluster: ", err.Error())
+        }
 
-        // (Later) Resychronize again. 
+        err = ch.Publish(
+            "events",           // Exchange Name.
+            "",                 // Routing Key.
+            false,              // Mandatory.
+            false,              // Immediate.
+            amqp.Publishing{
+                ContentType: "text/plain",
+                Body: bytes,
+            })
+        
+        if err != nil {
+            log.Fatal("Error: Failed to publish message: ", err.Error())
+        }
+        fmt.Println("-> Dispatched message to exchange!")
     }
 }
 
@@ -187,7 +234,9 @@ func main () {
     go eventHandler(clusterChannel)
 
     // Close listener when application closes.
-    defer socket.Close()
+    defer func() {
+        socket.Close()
+    }()
 
     // Wait for connections. 
     for {

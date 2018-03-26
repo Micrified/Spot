@@ -16,7 +16,13 @@ hello/
 stacker/
 bigdigits/
 americanise/
-github.com/
+github.com/MichaelTJones/
+github.com/uudashr/
+polar2cartesian/
+consumer/
+producer/
+publisher/
+subscriber/
 
 # macOS garbage.
 .DS_Store
