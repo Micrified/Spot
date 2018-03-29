@@ -67,6 +67,11 @@ public class GraphEffect implements Persistent {
         return Math.min(radius, this.state);
     }
 
+    /* Returns the amplitude of the wave */
+    public float getAmplitude() {
+        return (1.0f - ((float)state / (float)radius));
+    }
+
     /* Returns the coordinates of the circle's midpoint */
     public Point getMidpoint() {
         double x = origin.getX() + radius;

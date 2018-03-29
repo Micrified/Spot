@@ -103,13 +103,25 @@ public class GraphVertex implements Persistent {
     }
 
     /* Returns the JSON representation of the Vertex */
-    public String toJSON(long time) {
+    public String toJSON(long time, float amplitude) {
+        float[] signal = new float[]{0.0f, 0.0f, 50.0f, 27.0f, 8.0f, 1.0f, 0.0f};
+        String signalString = "";
 
+        // Apply amplitude to signal template.
+        for (int i = 0; i < signal.length; i++) {
+            signalString += String.format("%.1f", signal[i] * amplitude);
+            if (i < signal.length - 1) {
+                signalString += ",";
+            }
+        }
+
+        // Prepare JSON datagram.
         String json = Q("Id") + ":" + name + "," +
-                      Q("When") + ":" + "\"2018-03-29T13:13:20.907998319+02:00\"" + "," +
+                      Q("When") + ":" + time + "," + 
                       Q("Location") + ":[" + origin.getX() + "," + origin.getY() + "]," +
-                      Q("Signal") + ":[0,0,1,2,3,8,10,8,3,2,1,0,0]";
-
+                      Q("Signal") + ":[" + signalString + "]";
+        
+        // Return JSON data.
         return "{" + json + "}";
     }
     

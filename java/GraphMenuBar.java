@@ -13,9 +13,6 @@ public class GraphMenuBar extends JMenuBar {
     private GraphFrame delegate;
     private JMenu fileMenu;
     private JMenu editMenu;
-    private JMenu viewMenu;
-    private JMenu helpMenu;
-    
     
     /* ******** Constructor ******** */
     public GraphMenuBar(GraphFrame delegate) {
@@ -25,36 +22,16 @@ public class GraphMenuBar extends JMenuBar {
         
         /* Create Menus */
         fileMenu = new JMenu("File");
-        editMenu = new JMenu("Edit");
-        viewMenu = new JMenu("View");
-        helpMenu = new JMenu("Help");
         
         /* Create File Menu Items */
         JMenuItem saveMenuItem = new JMenuItem("Save");
         JMenuItem saveAsMenuItem = new JMenuItem("Save As");
         JMenuItem loadMenuItem = new JMenuItem("Load");
         
-        /* Create Edit Menu Items */
-        JMenuItem undoMenuItem = new JMenuItem("Undo");
-        JMenuItem redoMenuItem = new JMenuItem("Redo");
-        
-        /* Create View Menu Items */
-        JMenuItem duplicateMenuItem = new JMenuItem("Duplicate");
-        
-        /* Create Help Menu Items */
-        JMenuItem helpMenuItem = new JMenuItem("Help me!");
-        
         /* Add Items to their Menus */
         fileMenu.add(saveMenuItem);
         fileMenu.add(saveAsMenuItem);
         fileMenu.add(loadMenuItem);
-        
-        editMenu.add(undoMenuItem);
-        editMenu.add(redoMenuItem);
-        
-        viewMenu.add(duplicateMenuItem);
-        
-        helpMenu.add(helpMenuItem);
         
         /* Add ActionListeners for File-Menu Items */
         saveMenuItem.addActionListener(new ActionListener(){
@@ -78,42 +55,8 @@ public class GraphMenuBar extends JMenuBar {
             }
         });
         
-        /* Add ActionListeners for Edit-Menu Items */
-        undoMenuItem.addActionListener(new ActionListener(){
-            @Override
-            public void actionPerformed(ActionEvent e){
-                GraphMenuBar.this.delegate.didUndo();
-            }
-        });
-        
-        redoMenuItem.addActionListener(new ActionListener(){
-            @Override
-            public void actionPerformed(ActionEvent e){
-                GraphMenuBar.this.delegate.didRedo();
-            }
-        });
-        
-        /* Add ActionListeners for View-Menu Items */
-        duplicateMenuItem.addActionListener(new ActionListener(){
-            @Override
-            public void actionPerformed(ActionEvent e){
-                GraphMenuBar.this.delegate.didDuplicate();
-            }
-        });
-        
-        /* Add ActionListeners for Help-Menu Items */
-        helpMenuItem.addActionListener(new ActionListener(){
-            @Override
-            public void actionPerformed(ActionEvent e){
-                GraphMenuBar.this.delegate.didRequestHelp();
-            }
-        });
-        
         /* Add Menu's to the MenuBar */
         this.add(fileMenu);
-        this.add(editMenu);
-        this.add(viewMenu);
-        this.add(helpMenu);
     }
     
     /* ******** Setters ******** */

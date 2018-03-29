@@ -132,16 +132,20 @@ public class GraphModel implements Persistent {
     /* Updates the triggered states of all vertices. Sends all signals to server. */
     public void updateVertexStates() {
         for (GraphVertex v : this.vertices) {
-            Boolean triggered = false;
-            long time;
+            Boolean triggered = false;              // Whether or not the sensor is triggered.
+            long time;                              // The time at which the sensor was triggered (UNIX)
+            float amplitude;                        // The immediate strength of the signal.
 
             // If triggered by any effect, it is triggered.
             for (GraphEffect e : this.effects) {
+
                 if (v.isTriggered() == false && v.isTriggeredByEffect(e)) {
                     triggered = true;
                     time = System.currentTimeMillis();
+                    amplitude = e.getAmplitude();
 
-                    String json = v.toJSON(time);
+                    String json = v.toJSON(time, amplitude);
+                    System.out.println("Sending: \"" + json + "\"");
                     ServerConnector connector = new ServerConnector(port, address);
                     if (connector.send(json) == false) {
                         System.out.println("Error: Couldn't send triggered sensor data!");

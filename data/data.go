@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	AMP_THRESHOLD	= 10
+	AMP_THRESHOLD	= 10.0
 )
 
 /* 
@@ -20,14 +20,14 @@ const (
 // An atomic sensor data packet.
 type Gram struct {
 	Id			int
-	When 		time.Time
+	When 		int64
 	Location	[]float64 
-	Signal 		[]int
+	Signal 		[]float64
 }
 
 // Sorting method for the Gram type.
 func (g Gram) Compare(x Gram) bool {
-	return g.When.Before(x.When)
+	return g.When < x.When
 }
 
 // Returns true if given Gram is within certain radius of another.
@@ -40,8 +40,8 @@ func (g Gram) Nearby(x Gram, r float64) bool {
 
 // Returns true if the given Gram has a signal with amplitude of interest.
 func IsInteresting (g Gram) bool {
-	for a := range g.Signal {
-		if a > AMP_THRESHOLD {
+	for _, v := range g.Signal {
+		if v > AMP_THRESHOLD {
 			return true
 		}
 	}
@@ -51,9 +51,9 @@ func IsInteresting (g Gram) bool {
 // Generates a Gram.
 func Generate() Gram {
 	i := 8
-	t := time.Now()
+	t := time.Now().Unix() * 1000		// Convert to milliseconds
 	l := []float64{1.5, 2.5}
-	s := []int{0,0,1,2,3,8,10,8,3,2,1,0,0}
+	s := []float64{0,0,1,2,3,8,10,8,3,2,1,0,0}
 	return Gram{i, t, l, s}
 }
 
@@ -65,7 +65,8 @@ func Generate() Gram {
 
 // A Gram clustering type.
 type Cluster struct {
-	Updated time.Time
+	Id int64
+	Updated int64
 	Members []Gram
 }
 
@@ -81,17 +82,17 @@ func (c Cluster) Bytes() ([]byte, error) {
 // Inserts a Gram into a Cluster.
 func (c *Cluster) Insert(g Gram) {
 	c.Members = append(c.Members, g)
-	if g.When.After(c.Updated) {
+	if g.When > c.Updated {
 		c.Updated = g.When
 	}
 }
 
 // Purges all expired Grams from the given Cluster.
 func (c *Cluster) Update(threshold int) {
-	cutoff := time.Now().Add(-time.Second * time.Duration(threshold))
+	cutoff := (time.Now().Unix() - int64(threshold)) * 1000
 	var survivors []Gram
 	for _, g := range c.Members {
-		if g.When.After(cutoff) {
+		if g.When > cutoff {
 			survivors = append(survivors, g)
 		}
 	}
@@ -100,8 +101,8 @@ func (c *Cluster) Update(threshold int) {
 
 // Determines if the Cluster has expired (last added Gram expired).
 func (c Cluster) Expired(threshold int) bool {
-	cutoff := time.Now().Add(-time.Second * time.Duration(threshold))
-	return cutoff.After(c.Updated)
+	cutoff := (time.Now().Unix() * 1000) + int64(threshold)
+	return cutoff > c.Updated
 }
 
 // Returns true if the given Gram belongs in the Cluster.

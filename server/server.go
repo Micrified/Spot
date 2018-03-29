@@ -24,6 +24,15 @@ const (
     DEFAULT_BUF_SIZE    = 1024
 )
 
+const init_msg = "======================== SERVER ========================\n" +
+                 "Address:\t\t%s\n" +
+                 "Port:\t\t\t%s\n" + 
+                 "========================================================\n" +
+                 "Time Threshold:\t\t\t%d seconds\n" +
+                 "Sensor Threshold:\t\t%d sensors\n" +
+                 "Clustering Radius:\t\t%.3f kilometers\n\n"
+                 
+
 /* 
  ******************************************************************************
  *                                   Globals
@@ -45,7 +54,51 @@ var Threshold_Radius float64
  ******************************************************************************
 */
 
+// Checks if err is nil. If non-nil -> Program terminates.
+func failOnError (err error, msg string) {
+    if err != nil {
+        log.Fatal("[!] Fatal Error: ", msg, "(", err.Error(), ")\n")
+    }
+}
 
+// Checks if error is nil. If non-nil, message shown. Returns true if non-nil.
+func failWithMsg (err error, h string, pass string, fail string) bool {
+    var suffix string
+    if err != nil {
+        suffix = fail
+    } else {
+        suffix = pass
+    }
+    fmt.Printf("%s: %s", h, suffix); fmt.Println("(", err.Error(), ")")
+    return err != nil
+}
+
+// Purges expired clusters from the given slice.
+func pruneClusters (cs []interface{}) []interface{} {
+    var survivors []interface{}
+
+    for _, c := range cs {
+        k := c.(data.Cluster)
+        if k.Expired(Threshold_Time) {
+            continue
+        }
+        k.Update(Threshold_Time)
+        survivors = append(survivors, k)
+    }
+
+    return survivors
+}
+
+// Returns true and cluster index if fitting cluster found for given gram.
+func fitsCluster (g data.Gram, cs []interface{}) (bool, int) {
+    for i, c := range cs {
+        k := c.(data.Cluster)
+        if k.Suits(g, Threshold_Radius) {
+            return true, i
+        }
+    }
+    return false, 0
+}
 
 /* 
  ******************************************************************************
@@ -55,83 +108,65 @@ var Threshold_Radius float64
 
 // Handler for incoming connections to the server. 
 func requestHandler (conn net.Conn, in chan data.Gram) {
-    fmt.Println("RequestHandler :: Launched for new connection!")
+    fmt.Println("• RequestHandler :: -> Incoming!")
+
     // Initialize data buffer.
     buf := make([]byte, DEFAULT_BUF_SIZE)
 
     // Copy bytes to buffer.
     count, err := conn.Read(buf)
-    if err != nil {
-        log.Fatal("Connection Error: ", err.Error())
-    }
+    failOnError(err, "Bad Connection!")
 
     // Close connection.
     conn.Close()
 
     // Deserialize JSON to data.Gram.
-    fmt.Printf("RECEIVED [%d bytes]: %s\n", count, string(buf[:count]))
+    fmt.Printf("• RequestHandler :: ~ %d bytes received.\n", count)
 
     var g data.Gram
     if err = json.Unmarshal(buf[:count], &g); err != nil {
         log.Fatal("Deserialization Error: ", err.Error())
     }
 
-    g.When = time.Now()
+    g.When = time.Now().Unix() * 1000
 
     // If datagram is important, send to cluster queue.
     if data.IsInteresting(g) {
-        fmt.Println("• Gram is interesting.")
+        fmt.Println("• RequestHandler :: Sent Gram to -> [Queue]!")
         in <- g
     } else {
-        fmt.Println("• Gram discarded.")
+        fmt.Println("• RequestHandler :: Sent Gram to -> [Trash]!")
     }
 }
 
 // Handler for incoming data grams.
 func queueHandler (in chan data.Gram, out chan data.Cluster) {
     var q queue.Queue
-    fmt.Println("QueueHandler :: Active and listening!")
+    fmt.Println("• QueueHandler :: Ready!")
     for {
-
         // Accept data gram.
         g := <- in
 
-        fmt.Println("QueueHandler :: Accepted new Gram!")
-
-        // Remove expired events.
-        fmt.Println("• Removing Expired Clusters")
-        var survivors []interface{}
-        for _, c := range q {
-            k := c.(data.Cluster)
-            if !k.Expired(Threshold_Time) {
-                k.Update(Threshold_Time)
-                survivors = append(survivors, k)
-            }
-        }
-        q = survivors
-        fmt.Printf("• %d clusters survived!\n", len(q))
+        // Prune expired clusters.
+        q = pruneClusters(q)
+        fmt.Printf("• QueueHandler :: Pruned Clusters [%d survived]\n", len(q))
 
         // Try to find suitable cluster for gram.
-        fmt.Println("• Searching for suitable cluster...")
-        matched := false
-        for i, c := range q {
-            k := c.(data.Cluster)
-            if k.Suits(g, Threshold_Radius) {
-                k.Insert(g)
-                matched = true
-                q[i] = k
-                break
-            }
-        }
-        if !matched {
-            fmt.Println("• No matches -> Installing new cluster!")
+        match, i := fitsCluster(g, q)
+        if match {
+            k := q[i].(data.Cluster)
+            k.Insert(g)
+            q[i] = k
+            fmt.Printf("• QueueHandler :: Gram %d -> Cluster %d\n", g.Id, k.Id)
+        } else {
             var c data.Cluster
+            c.Id = time.Now().Unix()
             c.Insert(g)
-            fmt.Println("• Cluster after insertion: ", c)
             q.Enqueue(c)
+            fmt.Printf("• QueueHandler :: Gram %d -> New Cluster %d\n", g.Id, c.Id)
         }
 
-        // Create events for important clusters.
+        // Send important clusters.
         for _, c := range q {
             k := c.(data.Cluster)
             if len(k.Members) >= Threshold_Sensor {
@@ -143,21 +178,22 @@ func queueHandler (in chan data.Gram, out chan data.Cluster) {
 
 // Handler for incoming events (important/flagged clusters)
 func eventHandler (in chan data.Cluster) {
-    fmt.Println("EventHandler :: Starting up ...")
 
     // Open connection to message exchange.
     conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
+
+    //if failWithMsg(err, "• EventHandler :", "Ready!", "Failed to connect to Exchange!") {
+        //return
+    //}
     if err != nil {
-        fmt.Println("Error: Failed to connect to exchange. Server operating in offline mode!")
-        fmt.Println("Cause: ", err.Error())
-        return;
+        log.Fatal("Crash!", err.Error())
+    } else {
+        fmt.Println("• EventHandler: Ready!")
     }
 
     // Open input channel.
     ch, err := conn.Channel()
-    if err != nil {
-        log.Fatal("Error: Failed to open channel with connection object: ", err.Error())
-    }
+    failOnError(err, "Failed to start channel with connection object!")
 
     // Deferred clean-up.
     defer func() {
@@ -175,22 +211,16 @@ func eventHandler (in chan data.Cluster) {
         false,                  // No-wait.
         nil,                    // Arguments.
     )
-    if err != nil {
-        log.Fatal("Error: Failed to declare an exchange: ", err.Error())
-    }
+    failOnError(err, "Exchange declaration failed!")
 
     for {
 
         // Accept important cluster.
         c := <- in
-        fmt.Println("EventHandler: Important Event = ", c)
 
         // Export to exchange.
         bytes, err := c.Bytes()
-
-        if err != nil {
-            log.Fatal("Error: Failed to serialize cluster: ", err.Error())
-        }
+        failOnError(err, "Failed to serialize cluster!")
 
         err = ch.Publish(
             "events",           // Exchange Name.
@@ -201,11 +231,8 @@ func eventHandler (in chan data.Cluster) {
                 ContentType: "text/plain",
                 Body: bytes,
             })
-        
-        if err != nil {
-            log.Fatal("Error: Failed to publish message: ", err.Error())
-        }
-        fmt.Println("-> Dispatched message to exchange!")
+        failOnError(err, "Failed to publish message!")
+        fmt.Println("• EventHandler :: Message → Exchange")
     }
 }
 
@@ -220,16 +247,16 @@ func main () {
     // Set server settings [hardcoded].
     Threshold_Time      = 60        // Seconds
     Threshold_Sensor    = 3         // Count
-    Threshold_Radius    = 50.0       // Kilometers.
+    Threshold_Radius    = 50.0      // Kilometers.
 
     // Display Initialization Message:
-    fmt.Printf("Initialized.\n- Time Threshold: %d\n- Server Threshold: %d\n- Trigger Radius: %f\n", Threshold_Time, Threshold_Sensor, Threshold_Radius)
+    fmt.Printf(init_msg, DEFAULT_NET_HOST, DEFAULT_NET_PORT, 
+        Threshold_Time, Threshold_Sensor, Threshold_Radius);
 
     // Listen for incoming connections.
     socket, err := net.Listen(DEFAULT_NET_TYPE, DEFAULT_NET_HOST + ":" + DEFAULT_NET_PORT)
-    if err != nil {
-        log.Fatal("Error starting socket: ", err.Error())
-    }
+    failOnError(err, "Bad socket!")
+
     // Initialize Inter-Routine Channels.
     gramChannel := make(chan data.Gram)
     clusterChannel := make(chan data.Cluster)
@@ -250,9 +277,7 @@ func main () {
 
         // Accept connection.
         conn, err := socket.Accept()
-        if err != nil {
-            log.Fatal("Socket Error: ", err.Error())
-        }
+        failOnError(err, "Bad Connection!")
 
         // Launch request handler.
         go requestHandler(conn, gramChannel)
