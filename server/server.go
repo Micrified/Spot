@@ -8,6 +8,7 @@ import (
     "queue"
     "data"
     "github.com/streadway/amqp"
+    "time"
 )
 
 /* 
@@ -68,10 +69,14 @@ func requestHandler (conn net.Conn, in chan data.Gram) {
     conn.Close()
 
     // Deserialize JSON to data.Gram.
+    fmt.Printf("RECEIVED [%d bytes]: %s\n", count, string(buf[:count]))
+
     var g data.Gram
     if err = json.Unmarshal(buf[:count], &g); err != nil {
         log.Fatal("Deserialization Error: ", err.Error())
     }
+
+    g.When = time.Now()
 
     // If datagram is important, send to cluster queue.
     if data.IsInteresting(g) {
@@ -143,7 +148,9 @@ func eventHandler (in chan data.Cluster) {
     // Open connection to message exchange.
     conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
     if err != nil {
-        log.Fatal("Error: Failed to connect to exchange: ", err.Error())
+        fmt.Println("Error: Failed to connect to exchange. Server operating in offline mode!")
+        fmt.Println("Cause: ", err.Error())
+        return;
     }
 
     // Open input channel.
@@ -213,7 +220,7 @@ func main () {
     // Set server settings [hardcoded].
     Threshold_Time      = 60        // Seconds
     Threshold_Sensor    = 3         // Count
-    Threshold_Radius    = 1.0       // Kilometers.
+    Threshold_Radius    = 50.0       // Kilometers.
 
     // Display Initialization Message:
     fmt.Printf("Initialized.\n- Time Threshold: %d\n- Server Threshold: %d\n- Trigger Radius: %f\n", Threshold_Time, Threshold_Sensor, Threshold_Radius)

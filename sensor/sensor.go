@@ -28,6 +28,8 @@ func sendDataGram (gram data.Gram) {
 		log.Fatal("Couldn't serialize DataGram!")
 	}
 
+	fmt.Printf("JSON: %s\n", json)
+
 	// Construct the server address, and open a connection.
 	addr := strings.Join([]string{CONN_HOST, CONN_PORT}, ":")
 	fmt.Println("Will connect on: ", addr, " and send ", json)

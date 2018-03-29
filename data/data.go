@@ -48,6 +48,15 @@ func IsInteresting (g Gram) bool {
 	return false
 }
 
+// Generates a Gram.
+func Generate() Gram {
+	i := 8
+	t := time.Now()
+	l := []float64{1.5, 2.5}
+	s := []int{0,0,1,2,3,8,10,8,3,2,1,0,0}
+	return Gram{i, t, l, s}
+}
+
 /* 
  ******************************************************************************
  *                                  Cluster
