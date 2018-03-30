@@ -17,6 +17,7 @@ import (
  ******************************************************************************
 */
 
+// Server Information.
 const (
     DEFAULT_NET_HOST    = "localhost"
     DEFAULT_NET_PORT    = "8024"
@@ -24,13 +25,26 @@ const (
     DEFAULT_BUF_SIZE    = 1024
 )
 
+// Exchange Information
+const (
+    EXCHANGE_NET_NAME   = "test"
+    EXCHANGE_NET_PSWD   = "test"
+    EXCHANGE_NET_ADDR   = "192.168.2.2"
+    EXCHANGE_NET_PORT   = "5672"
+)
+
 const init_msg = "======================== SERVER ========================\n" +
                  "Address:\t\t%s\n" +
                  "Port:\t\t\t%s\n" + 
+                 "======================= EXCHANGE =======================\n" +
+                 "Login Name:\t\t%s\n" +
+                 "Password:\t\t%s\n" +
+                 "Address:\t\t%s\n" +
+                 "Port:\t\t\t%s\n" +
                  "========================================================\n" +
-                 "Time Threshold:\t\t\t%d seconds\n" +
+                 "Time Threshold:\t\t\t%d milliseconds\n" +
                  "Sensor Threshold:\t\t%d sensors\n" +
-                 "Clustering Radius:\t\t%.3f kilometers\n\n"
+                 "Clustering Radius:\t\t%.3f meters\n\n"
                  
 
 /* 
@@ -53,6 +67,11 @@ var Threshold_Radius float64
  *                             Utility Routines
  ******************************************************************************
 */
+
+// Constructs a dial/login message for the RabbitMQ message exchange.
+func getMQAddress(name, password, address, port string) string {
+    return "amqp://" + name + ":" + password + "@" + address + ":" + port
+}
 
 // Checks if err is nil. If non-nil -> Program terminates.
 func failOnError (err error, msg string) {
@@ -128,8 +147,6 @@ func requestHandler (conn net.Conn, in chan data.Gram) {
         log.Fatal("Deserialization Error: ", err.Error())
     }
 
-    g.When = time.Now().Unix() * 1000
-
     // If datagram is important, send to cluster queue.
     if data.IsInteresting(g) {
         fmt.Println("• RequestHandler :: Sent Gram to -> [Queue]!")
@@ -142,7 +159,7 @@ func requestHandler (conn net.Conn, in chan data.Gram) {
 // Handler for incoming data grams.
 func queueHandler (in chan data.Gram, out chan data.Cluster) {
     var q queue.Queue
-    fmt.Println("• QueueHandler :: Ready!")
+    fmt.Println("• QueueHandler :: Standing By!")
     for {
         // Accept data gram.
         g := <- in
@@ -160,7 +177,7 @@ func queueHandler (in chan data.Gram, out chan data.Cluster) {
             fmt.Printf("• QueueHandler :: Gram %d -> Cluster %d\n", g.Id, k.Id)
         } else {
             var c data.Cluster
-            c.Id = time.Now().Unix()
+            c.Id = time.Now().UnixNano()    // Cluster Id is nanosecond time stamp.
             c.Insert(g)
             q.Enqueue(c)
             fmt.Printf("• QueueHandler :: Gram %d -> New Cluster %d\n", g.Id, c.Id)
@@ -180,15 +197,20 @@ func queueHandler (in chan data.Gram, out chan data.Cluster) {
 func eventHandler (in chan data.Cluster) {
 
     // Open connection to message exchange.
-    conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
+    var conn *amqp.Connection
+    var err error
 
-    //if failWithMsg(err, "• EventHandler :", "Ready!", "Failed to connect to Exchange!") {
-        //return
-    //}
-    if err != nil {
-        log.Fatal("Crash!", err.Error())
-    } else {
-        fmt.Println("• EventHandler: Ready!")
+    for {
+        conn, err = amqp.Dial(getMQAddress(EXCHANGE_NET_NAME, EXCHANGE_NET_PSWD, 
+            EXCHANGE_NET_ADDR, EXCHANGE_NET_PORT))
+        if err != nil {
+            fmt.Println("• EventHandler :: Failed to connect! (", err.Error(), ")")
+            fmt.Println("• EventHandler :: Trying again in five seconds ...")
+            time.Sleep(5)
+        } else {
+            fmt.Println("• EventHandler :: (huffs heavily) Standing By!")
+            break
+        }
     }
 
     // Open input channel.
@@ -245,13 +267,15 @@ func eventHandler (in chan data.Cluster) {
 func main () {
 
     // Set server settings [hardcoded].
-    Threshold_Time      = 60        // Seconds
+    Threshold_Time      = 6000      // Milliseconds
     Threshold_Sensor    = 3         // Count
-    Threshold_Radius    = 50.0      // Kilometers.
+    Threshold_Radius    = 250.0      // Meters.
 
     // Display Initialization Message:
     fmt.Printf(init_msg, DEFAULT_NET_HOST, DEFAULT_NET_PORT, 
-        Threshold_Time, Threshold_Sensor, Threshold_Radius);
+        EXCHANGE_NET_NAME, EXCHANGE_NET_PSWD, 
+        EXCHANGE_NET_ADDR, EXCHANGE_NET_PORT, Threshold_Time, 
+        Threshold_Sensor, Threshold_Radius);
 
     // Listen for incoming connections.
     socket, err := net.Listen(DEFAULT_NET_TYPE, DEFAULT_NET_HOST + ":" + DEFAULT_NET_PORT)
@@ -260,6 +284,8 @@ func main () {
     // Initialize Inter-Routine Channels.
     gramChannel := make(chan data.Gram)
     clusterChannel := make(chan data.Cluster)
+
+    fmt.Println("Main: All wings report in ...")
 
     // Launch queue handler.
     go queueHandler(gramChannel, clusterChannel)

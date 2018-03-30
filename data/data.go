@@ -34,7 +34,7 @@ func (g Gram) Compare(x Gram) bool {
 func (g Gram) Nearby(x Gram, r float64) bool {
 	dx := g.Location[0] - x.Location[0]
 	dy := g.Location[1] - x.Location[1]
-	fmt.Printf("• Sensor %d picked up a signal within %f kilometers of sensor %d!\n", g.Id, math.Sqrt(dx * dx + dy * dy), x.Id)
+	fmt.Printf("• Sensor %d picked up a signal within %f meters of sensor %d!\n", g.Id, math.Sqrt(dx * dx + dy * dy), x.Id)
 	return (r * r >= dx * dx + dy * dy)
 }
 
@@ -46,15 +46,6 @@ func IsInteresting (g Gram) bool {
 		}
 	}
 	return false
-}
-
-// Generates a Gram.
-func Generate() Gram {
-	i := 8
-	t := time.Now().Unix() * 1000		// Convert to milliseconds
-	l := []float64{1.5, 2.5}
-	s := []float64{0,0,1,2,3,8,10,8,3,2,1,0,0}
-	return Gram{i, t, l, s}
 }
 
 /* 
@@ -79,17 +70,22 @@ func (c Cluster) Bytes() ([]byte, error) {
 	return []byte(json), nil
 }
 
-// Inserts a Gram into a Cluster.
+// Inserts a Gram into a Cluster. If an entry exists, it is just updated.
 func (c *Cluster) Insert(g Gram) {
-	c.Members = append(c.Members, g)
-	if g.When > c.Updated {
-		c.Updated = g.When
+	c.Updated = int64(math.Max(float64(g.When), float64(c.Updated)))
+
+	for i, m := range c.Members {
+		if (g.Id == m.Id) {
+			c.Members[i] = g
+			return
+		}
 	}
+	c.Members = append(c.Members, g)
 }
 
 // Purges all expired Grams from the given Cluster.
 func (c *Cluster) Update(threshold int) {
-	cutoff := (time.Now().Unix() - int64(threshold)) * 1000
+	cutoff := (time.Now().Unix() * 1000 - int64(threshold))
 	var survivors []Gram
 	for _, g := range c.Members {
 		if g.When > cutoff {
@@ -101,7 +97,7 @@ func (c *Cluster) Update(threshold int) {
 
 // Determines if the Cluster has expired (last added Gram expired).
 func (c Cluster) Expired(threshold int) bool {
-	cutoff := (time.Now().Unix() * 1000) + int64(threshold)
+	cutoff := (time.Now().Unix() * 1000 - int64(threshold))
 	return cutoff > c.Updated
 }
 

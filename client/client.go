@@ -8,10 +8,24 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Exchange Information
+const (
+    EXCHANGE_NET_NAME   = "test"
+    EXCHANGE_NET_PSWD   = "test"
+    EXCHANGE_NET_ADDR   = "192.168.2.2"
+    EXCHANGE_NET_PORT   = "5672"
+)
+
+// Constructs a dial/login message for the RabbitMQ message exchange.
+func getMQAddress(name, password, address, port string) string {
+    return "amqp://" + name + ":" + password + "@" + address + ":" + port
+}
+
 func main () {
 
 	// Open connection to exchange.
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672")
+	conn, err := amqp.Dial(getMQAddress(EXCHANGE_NET_NAME, EXCHANGE_NET_PSWD, 
+		EXCHANGE_NET_ADDR, EXCHANGE_NET_PORT))
 	if err != nil {
 		log.Fatal("Error: Failed to connect to exchange: ", err.Error())
 	}
