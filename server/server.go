@@ -227,7 +227,7 @@ func eventHandler (in chan data.Cluster) {
     err = ch.ExchangeDeclare(
         "events",               // Exchange Name.
         "fanout",               // Exchange Type.
-        true,                   // Durable (resistance to crashing)
+        false,                   // Durable (resistance to crashing)
         false,                  // Auto-deleted.
         false,                  // Internal.
         false,                  // No-wait.
