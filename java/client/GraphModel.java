@@ -55,7 +55,7 @@ public class GraphModel {
         queueName = channel.queueDeclare().getQueue();
         channel.queueBind(queueName, EXCHANGE_NAME, "");
 
-        System.out.println(" [*] Connected to exchange!");
+        System.out.println(" [*] This is GraphModel -> Thermal Exhaust Port is wide open! (this means okay)");
 
         consumer = new DefaultConsumer(channel) {
             @Override
