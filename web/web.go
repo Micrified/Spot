@@ -9,11 +9,33 @@ import (
 	"time"
 	"math"
 )
+
+const table_style = "<style>" +
+					"table {" +
+					"border-collapse: collapse;" +
+					"width: 100%;" +
+					"}" + 
+					"th, td {" +
+					"border-bottom: 1px solid #ddd;" +
+					"padding: 15px;" +
+					"text-align: center;" +
+					"}" +
+					"td {" +
+					"height: 50px;" +
+					"}" +
+					"th {" + 
+					"background-color: #4CAF50;" +
+					"color: white;" +
+					"}" +
+					"tr:nth-child(even) {background-color: #f2f2f2;}" +
+					"</style>"
+
 const page_header = "<!DOCTYPE html>" +
 					"<html>" + 
+					"<head>" + table_style + "</head>" +
 					"<body>" +
 					"<h2 align=\"center\">Incidents</h2>" +
-					"<table style=\"width:100%\">" + 
+					"<table>" + 
 					"<tr>" + 
 					"<th>Time</th>" + 
 					"<th>No.Sensors</th>" + 
@@ -23,25 +45,6 @@ const page_header = "<!DOCTYPE html>" +
 const page_footer = "</table>" +
 					"</body>" +
 					"</html>"
-
-const page_html = "<!DOCTYPE html>" +
-				 "<html>" +
-				 "<body>" +
-				 "<h2 align=\"center\">Recent Incidents (%d)</h2>" +
-				 "<table style=\"width:100%\">" + 
-				 "<tr>" + 
-				 "<th>Time</th>" + 
-				 "<th>No.Sensors</th>" + 
-				 "<th>Appoximate Location</th>" +
-				 "</tr>" + 
-				 "<tr>" +
-				 "<td align=\"center\">14:45:66</td>" +
-				 "<td align=\"center\">3</td>" +
-				 "<td align=\"center\">(453,343)</td>" +
-				 "</tr>" +
-				 "</table>" +
-				 "</body>" +
-				 "</html>"
 
 /* 
  ******************************************************************************
@@ -120,9 +123,9 @@ func getClusterHTML(cluster data.Cluster) string {
 	location,_ := time.LoadLocation("Europe/Amsterdam")
 	x, y := computeOrigin(cluster)
 	tm := time.Unix(cluster.Updated / 1000, 0).UTC().In(location)
-	t := fmt.Sprintf("<td align=\"center\">%s</td>", tm.String())
-	n := fmt.Sprintf("<td align=\"center\">%d</td>", len(cluster.Members))
-	o := fmt.Sprintf("<td align=\"center\">(%d,%d)</td>", int64(x), int64(y))
+	t := fmt.Sprintf("<td>%s</td>", tm.String())
+	n := fmt.Sprintf("<td>%d</td>", len(cluster.Members))
+	o := fmt.Sprintf("<td>(%d,%d)</td>", int64(x), int64(y))
 	
 	return "<tr>" + t + n + o + "</tr>"
 }

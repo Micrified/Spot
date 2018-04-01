@@ -17,7 +17,9 @@ public class GraphModel {
     /* ******** Properties ******** */
     private ClusterParser parser = new ClusterParser();
     private ArrayList<GraphCluster> clusters = new ArrayList<GraphCluster>();
-    private ArrayList<GraphCluster> incoming = new ArrayList<GraphCluster>();
+
+    // Thread safe arrivals list.
+    private List<GraphCluster> arrivals = Collections.synchronizedList(new ArrayList<GraphCluster>());
 
     /* ******** RabbitMQ Properties ********* */
     private static final String EXCHANGE_NAME = "events";
@@ -67,7 +69,7 @@ public class GraphModel {
                 // Create Cluster.
                 GraphCluster cluster = parser.toGraphCluster(msg);
                 if (cluster != null) {
-                    GraphModel.this.addIncoming(cluster);
+                    GraphModel.this.addArrival(cluster);
                 } else {
                     System.out.println("GraphModel :: Failed to add incoming cluster!");
                 }
@@ -82,32 +84,33 @@ public class GraphModel {
     public void setClusters(ArrayList<GraphCluster> clusters) {
         this.clusters = clusters;
     }
-
-    public void setIncoming(ArrayList<GraphCluster> incoming) {
-        this.incoming = incoming;
-    }
     
     /* Getters */
     public ArrayList<GraphCluster> getClusters(){
         return this.clusters;
     }
 
-    public ArrayList<GraphCluster> getIncoming() {
-        return this.incoming;
+    public List<GraphCluster> getArrivals() {
+        ArrayList<GraphCluster> copy = new ArrayList<GraphCluster>();
+        copy.addAll(arrivals);
+        return copy;
     }
 
     /* ******** Interface ********* */
 
-    /* Add an incoming cluster instance to the graph */
-    public void addIncoming (GraphCluster cluster) {
-        this.incoming.add(cluster);
+    /* Clears the arrivals list */
+    public void clearArrivals() {
+        this.arrivals.clear();
+    }
+
+    /* Add an arriving cluster instance to the graph */
+    public void addArrival (GraphCluster cluster) {
+        this.arrivals.add(cluster);
     }
 
     /* Add a Cluster instance to the graph */
     public void addCluster(GraphCluster cluster) {
-        if (!this.clusters.contains(cluster)) {
-            this.clusters.add(cluster);
-        }
+        this.clusters.add(cluster);
     }
 
 }

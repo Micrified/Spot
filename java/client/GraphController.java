@@ -87,35 +87,41 @@ public class GraphController implements MouseMotionListener, MouseListener, KeyL
     }
     
     /* ******** Interface ******** */
-    
-    /* Orders the GraphPanel instance to re-draw */
-    public void refreshGraph(){
-        ArrayList<GraphCluster> survivors = model.getIncoming();
 
-        // Remove clusters with matching id's as those in incoming.
-        for (GraphCluster c : model.getClusters()) {
-            boolean shouldAdd = true;
-            for (GraphCluster i : model.getIncoming()) {
-                if (i.getIdentifer().equals(c.getIdentifer()) || c.isExpired()) {
-                    shouldAdd = false;
-                    break;
-                }
+    /* Returns True if the given cluster already exists in the given arraylist */
+    public Boolean containsCluster(GraphCluster cluster, ArrayList<GraphCluster> clusters) {
+        for (GraphCluster c : clusters) {
+            if (c.getIdentifer().equals(cluster.getIdentifer())) {
+                return true;
             }
-            if (shouldAdd) {
+        }
+        return false;
+    }
+
+    /* Performs re-drawing actions and refreshes GraphPanel */
+    public void refreshGraph() {
+
+        // Add newly arrived clusters to surviving set [getArrivals returns a copy!].
+        ArrayList<GraphCluster> survivors = (ArrayList<GraphCluster>)model.getArrivals();
+
+        // Only add current clusters if they're not in survivors and not expired.
+        for (GraphCluster c : model.getClusters()) {
+            if (!containsCluster(c, survivors) && !c.isExpired()) {
                 survivors.add(c);
             }
         }
 
-        // Update cluster.
-        this.model.setClusters(survivors);
+        // Clear the arrivals.
+        model.clearArrivals();
 
-        // Flush incoming.
-        this.model.setIncoming(new ArrayList<GraphCluster>());
+        // Reset the clusters.
+        model.setClusters(survivors);
 
-
+        // Refresh panels.
         for (GraphPanel panel : this.subscribers){
             panel.refresh();
         }
+
     }
     
     /* Registers a new Panel to receive information */

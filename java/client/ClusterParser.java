@@ -71,7 +71,7 @@ public class ClusterParser {
             System.out.println("ClusterParser :: toGraphCluster :: Expected ]}\n");
             return null;
         }
-
+        
         return cluster;
     }
 
