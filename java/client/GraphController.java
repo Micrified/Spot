@@ -90,6 +90,29 @@ public class GraphController implements MouseMotionListener, MouseListener, KeyL
     
     /* Orders the GraphPanel instance to re-draw */
     public void refreshGraph(){
+        ArrayList<GraphCluster> survivors = model.getIncoming();
+
+        // Remove clusters with matching id's as those in incoming.
+        for (GraphCluster c : model.getClusters()) {
+            boolean shouldAdd = true;
+            for (GraphCluster i : model.getIncoming()) {
+                if (i.getIdentifer().equals(c.getIdentifer()) || c.isExpired()) {
+                    shouldAdd = false;
+                    break;
+                }
+            }
+            if (shouldAdd) {
+                survivors.add(c);
+            }
+        }
+
+        // Update cluster.
+        this.model.setClusters(survivors);
+
+        // Flush incoming.
+        this.model.setIncoming(new ArrayList<GraphCluster>());
+
+
         for (GraphPanel panel : this.subscribers){
             panel.refresh();
         }

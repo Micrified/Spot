@@ -27,10 +27,10 @@ public class GraphCluster {
         return (++lifetime >= lifespan);
     }
 
-    // Computes the estimated origin of the signal.
+    // Computes the estimated origin of the signal.s
     private Point computeOrigin() {
         long minTime = Long.MAX_VALUE;
-        int x, y;
+        int x = 0, y = 0;
         float sum = 0;
 
         // Calculate min time
@@ -39,14 +39,16 @@ public class GraphCluster {
         }
 
         for(Sensor s : sensors) {
-            float t = Math.max(0, 1 - (float)(s.getTime() - minTime) / 1000);
+            float t = Math.max(0, 2 - (float)(s.getTime() - minTime) / 1000);
             x += s.getLocation().x * t;
             y += s.getLocation().y * t;
             sum += t;
         }
 
-        x = (int)(x / sum);
-        y = (int)(y / sum);
+        x = (int)((float)x / sum);
+        y = (int)((float)y / sum);
+
+        System.out.printf("Origin = (%d,%d)\n", x, y);
 
         return new Point(x,y);
     }

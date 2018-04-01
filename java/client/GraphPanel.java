@@ -111,7 +111,7 @@ public class GraphPanel extends JPanel {
         }
 
         // Draw estimated origin (graphics, text, color, point, diameter).
-        drawText(g, "•", Color.MAGENTA, estimate, 10);
+        drawText(g, "x", Color.CYAN, estimate, 10);
     }
     
     /* Draws a Vertex on the canvas */
@@ -154,9 +154,6 @@ public class GraphPanel extends JPanel {
         if (model == null){
             return;
         }
-
-        /* Remove Expired Effects */
-        model.removeExpiredClusters();
 
         /* Draw Background First */
         if (backgroundImage != null) {

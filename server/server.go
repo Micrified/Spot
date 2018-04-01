@@ -267,9 +267,9 @@ func eventHandler (in chan data.Cluster) {
 func main () {
 
     // Set server settings [hardcoded].
-    Threshold_Time      = 6000      // Milliseconds
+    Threshold_Time      = 3000      // Milliseconds
     Threshold_Sensor    = 3         // Count
-    Threshold_Radius    = 250.0      // Meters.
+    Threshold_Radius    = 160.0      // Meters.
 
     // Display Initialization Message:
     fmt.Printf(init_msg, DEFAULT_NET_HOST, DEFAULT_NET_PORT, 

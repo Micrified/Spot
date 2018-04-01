@@ -17,6 +17,7 @@ public class GraphModel {
     /* ******** Properties ******** */
     private ClusterParser parser = new ClusterParser();
     private ArrayList<GraphCluster> clusters = new ArrayList<GraphCluster>();
+    private ArrayList<GraphCluster> incoming = new ArrayList<GraphCluster>();
 
     /* ******** RabbitMQ Properties ********* */
     private static final String EXCHANGE_NAME = "events";
@@ -66,7 +67,7 @@ public class GraphModel {
                 // Create Cluster.
                 GraphCluster cluster = parser.toGraphCluster(msg);
                 if (cluster != null) {
-                    GraphModel.this.addCluster(cluster);
+                    GraphModel.this.addIncoming(cluster);
                 } else {
                     System.out.println("GraphModel :: Failed to add incoming cluster!");
                 }
@@ -81,13 +82,26 @@ public class GraphModel {
     public void setClusters(ArrayList<GraphCluster> clusters) {
         this.clusters = clusters;
     }
+
+    public void setIncoming(ArrayList<GraphCluster> incoming) {
+        this.incoming = incoming;
+    }
     
     /* Getters */
     public ArrayList<GraphCluster> getClusters(){
         return this.clusters;
     }
 
+    public ArrayList<GraphCluster> getIncoming() {
+        return this.incoming;
+    }
+
     /* ******** Interface ********* */
+
+    /* Add an incoming cluster instance to the graph */
+    public void addIncoming (GraphCluster cluster) {
+        this.incoming.add(cluster);
+    }
 
     /* Add a Cluster instance to the graph */
     public void addCluster(GraphCluster cluster) {
@@ -96,14 +110,4 @@ public class GraphModel {
         }
     }
 
-    /* Removes all expired clusters */
-    public void removeExpiredClusters() {
-        ArrayList<GraphCluster> survivors = new ArrayList<GraphCluster>();
-        for (GraphCluster c : this.clusters) {
-            if (c.isExpired() == false) {
-                survivors.add(c);
-            }
-        }
-        this.clusters = survivors;
-    }
 }
