@@ -7,6 +7,7 @@ import (
     "encoding/json"
     "queue"
     "data"
+    "web"
     "github.com/streadway/amqp"
     "time"
 )
@@ -240,6 +241,10 @@ func eventHandler (in chan data.Cluster) {
         // Accept important cluster.
         c := <- in
 
+        // Append to web-server queue.
+        fmt.Println("Sending: ", c)
+        web.AddEvent(c)
+
         // Export to exchange.
         bytes, err := c.Bytes()
         failOnError(err, "Failed to serialize cluster!")
@@ -285,6 +290,7 @@ func main () {
     gramChannel := make(chan data.Gram)
     clusterChannel := make(chan data.Cluster)
 
+
     fmt.Println("Main: All wings report in ...")
 
     // Launch queue handler.
@@ -292,6 +298,9 @@ func main () {
 
     // Launch event handler.
     go eventHandler(clusterChannel)
+
+    // Launch web handler.
+    go web.WebHandler()
 
     // Close listener when application closes.
     defer func() {
