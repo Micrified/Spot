@@ -29,7 +29,26 @@ public class GraphCluster {
 
     // Computes the estimated origin of the signal.
     private Point computeOrigin() {
-        return new Point(0,0);
+        long minTime = Long.MAX_VALUE;
+        int x, y;
+        float sum = 0;
+
+        // Calculate min time
+        for(Sensor s : sensors) {
+            minTime = Math.min(minTime, s.getTime());
+        }
+
+        for(Sensor s : sensors) {
+            float t = Math.max(0, 1 - (float)(s.getTime() - minTime) / 1000);
+            x += s.getLocation().x * t;
+            y += s.getLocation().y * t;
+            sum += t;
+        }
+
+        x = (int)(x / sum);
+        y = (int)(y / sum);
+
+        return new Point(x,y);
     }
 
     /************ Accessors: Getters *************/
