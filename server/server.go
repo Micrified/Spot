@@ -38,7 +38,7 @@ const (
 const (
     THRESHOLD_EXPIRE    = 3000              // Cluster Lifetime (milliseconds).
     THRESHOLD_SENSOR    = 3                 // Minimum Sensors for Event.
-    THRESHOLD_RADIUS    = 60.0              // Minimum Association Radius (meters).
+    THRESHOLD_RADIUS    = 200.0             // Minimum Association Radius (meters).
 )
 
 // Server Initialization Banner.
