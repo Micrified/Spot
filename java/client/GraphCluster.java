@@ -22,6 +22,18 @@ public class GraphCluster {
 
     /************ Methods *************/
 
+    // Returns a description of the cluster.
+    public String getDescription() {
+        String h = String.format("Cluster (ID = \"%s\")\n", this.identifier);
+        String l = String.format("* Last Updated:\t\t%d\n", this.lastUpdated);
+        String s = String.format("* Sensors Triggered:\t%d [", this.sensors.size());
+        for (int i = 0; i < this.sensors.size(); i++) {
+            Sensor sensor = this.sensors.get(i);
+            s += String.format("%s%s", sensor.getIdentifier(), (i < (this.sensors.size() - 1) ? "," : "]"));
+        }
+        return h + l + s;
+    }
+
     // Returns True if the cluster has expired.
     public Boolean isExpired() {
         return (++lifetime >= lifespan);

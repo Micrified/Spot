@@ -1,28 +1,50 @@
 # Spot
-Data Processing Network. Work in progress, purpose classified.
 
-## Local Network Setup.
+Spot is a signal processing network composed of several components.
+1. A Java Editor Application. This is located in java/editor/. It allows for simulation of a sensor network.
+2. A Go Server. This is located in server/. It performs signal filtering and aggregation. 
+3. A RabbitMQ message exchange. This software is not provided and must be downloaded by all interested parties.
+4. A Java Client Application. This is located in java/client/. It provides visualizations of a sensor network's activity.
 
-There are a couple of key files that must be modified when setting up this system on a local network. There are also a few assumptions made about how it is run.
-1. The Go server is run on localhost.
-2. The Editor (java app) is run on the same machine as the Go server.
-3. The RabbitMQ is run on any machine on the same local network as the Editor and Client java app.
-4. The Client (java app) is run on another machine on the same local network.
+## Installation
 
-In order to setup the software system assuming your machine has LAN IP 192.168.2.2, you must perform the following steps:
+This installation manual is written with the following assumptions in mind.
+1. The Go server is to be run on localhost.
+2. The Java Editor is run on the same machine as the Go server.
+3. The RabbitMQ editor is run on some machine residing on the local network to which both the server and editor have access.
+4. The Java Client is run on some machine on the local network.
 
-1. Ensure RabbitMQ (Reachable at localhost:15672 has a user with full permissions). Username = Password = "test".
-2. [macOS] Run "makeMQConfig.sh" with your IP (192.168.2.2 here) and the RabbitMQ port (5672). I.E: `sh makeMQConfig.sh 192.168.2.2 5672`. This should setup the config file in /usr/local/etc/rabbitmq/ to run RabbitMQ on your LAN ip and not 127.0.0.1 or whatever localhost is. 
-3. [macOS] Run "makeMQEnvConfig.sh" with your IP (192.168.2.2) as an argument.
-4. Edit `EXCHANGE_HOST` in `java/client/GraphModel.java` such that it contains your local IP.
-5. Edit `EXCHANGE_NET_ADDR` in `server/server.go` such that it contains your local IP.
+### RabbitMQ
+The RabbitMQ message exchange is to be initialized and accessed at it's default address: `localhost:15672`.
+Here, make the following modifications.
+1. Add a new user with username and password "test".
+2. Ensure this user has full permissions set.
+3. Execute `sh makeMQConfig.sh <LAN-IP-Address> 5672` to install the RabbitMQ configuation file in `/usr/local/etc/rabbitmq/`. Note that this is specific to macOS as of this time.
+4. Execute `sh makeMQEnvConfig.sh <LAN-IP-Address>` to install the RabbitMQ env file in the same location as the configuration file.
 
-## Running the Network. 
-1. Compile the Editor in `java/editor/` with `javac *.java` and run it with `java GraphEdit`. 
-2. Compile the server in `server/` with `go build` and execute with `./server`.
-3. Launch RabbitMQ with `rabbitmq-server`. 
-4. Compile the client in `java/client/` with `sh compile.sh` and run with `sh run.sh`. 
+### Other Files
+5. Edit `EXCHANGE_NET_ADDR` in `server/server.go` such that it contains your local IP address (the address now used by the RabbitMQ exchange).
 
-### Dependencies
+## Running the Programs.
+Perform all steps in the following order.
+1. Launch RabbitMQ with `rabbitmq-server`.
+2. Compile the server in `server/` with `go build` and execute with `./server`. 
+3. Compile the Editor in `java/editor/` with `javac *.java` and run it with `java GraphEdit`. 
+4. Compile the client in `java/client/` with `sh compile.sh` and run with `sh run.sh <LAN-IP-Address` where `LAN-IP-Address` is the address of the machine which is hosting the RabbitMQ message exchange. 
+
+Visit the server's webpage at `localhost:8080`.
+
+## Dependencies & Troubleshooting
+This project requires that Go and RabbitMQ be installed.
+
+### Go is not installed.
+Install Go following the official installation instructions on the Golang website. Remember to
+1. `export PATH=$PATH:/usr/local/go/bin` if that's where you installed Go. 
+2. `export GOPATH=$HOME/path-to-project`. The project should be located in a `/src` subdirectory at the end of `GOPATH`. 
+
+### The Client/Server fails to connect to Exchange
+Sometimes an exchange is setup with a setting which is not shared amongst other users of the exchange. Typically this is seen with an exchange having `Durable` set by one machine and not set on another. To solve this, log into the RabbitMQ web client and delete the `events` exchange. Restart everything and it should work.
+
+### RabbitMQ is not installed.
 The RabbitMQ packages used in this project are bundled with it. Normally you'd install these with `go get github.com/streadway/amqp`. You'll still need to install the server software yourself though. If you're running macOS, this can be easily accomplished with Brew. I assume most Linux systems can likewise install this with `apt-get`. 
 

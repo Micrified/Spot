@@ -18,24 +18,20 @@ public class GraphFrame extends JFrame implements ButtonInterface, WindowListene
     private GraphMenuBar menuBar;
     private GraphController graphController;
     private GraphButtonPanel buttonPanel;
-    private String fileName;
     private GraphViewer graphViewer;
 
     /* ******** Constructor ******** */
-    public GraphFrame(String title, String fileName, GraphModel model) {
+    public GraphFrame(String title, String exchangeAddress, GraphModel model) {
         super(title);
         
         /* Set Close Operation */
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
-        /* Save FileName */
-        this.fileName = fileName;
-        
         /* Create Menu */
         this.menuBar = new GraphMenuBar(this);
         
         /* Create Graph Controller */
-        this.graphController = new GraphController(this, model);
+        this.graphController = new GraphController(this, exchangeAddress);
         
         /* Create Buttons */
         this.buttonPanel = new GraphButtonPanel(this);

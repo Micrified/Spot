@@ -22,13 +22,13 @@ public class GraphController implements MouseMotionListener, MouseListener, KeyL
     private Timer timer;
 
     /* ******** Constructors ******** */
-    public GraphController(GraphFrame delegate, GraphModel model) {
+    public GraphController(GraphFrame delegate, String exchangeAddress) {
         
         /* Set Delegate (Necessary for disabling/enabling buttons) */
         this.delegate = delegate;
         
         /* Initialize Model */
-        this.model = (model == null ? new GraphModel() : model);
+        this.model = new GraphModel(exchangeAddress);
         
         /* Initialize graphPanel */
         this.graphPanel = new GraphPanel(this);

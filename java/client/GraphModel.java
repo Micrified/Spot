@@ -23,7 +23,7 @@ public class GraphModel {
 
     /* ******** RabbitMQ Properties ********* */
     private static final String EXCHANGE_NAME = "events";
-    private static final String EXCHANGE_HOST = "192.168.2.2";
+    private String EXCHANGE_HOST = "192.168.2.2";
     private static final String EXCHANGE_USER = "test";
     private static final String EXCHANGE_PSWD = "test";
 
@@ -37,11 +37,19 @@ public class GraphModel {
     /* ******** Constructors ********* */
     
     /* Default constructor */
-    public GraphModel() {
+    public GraphModel(String exchangeAddress) {
+
+        // Set the Exchange host address if it was provided.
+        if (exchangeAddress != null) {
+            EXCHANGE_HOST = exchangeAddress;
+        }
+
         try {
             connectToExchange();
         } catch (Exception e) {
             System.out.println("GraphModel: Failed to connect!\n");
+            System.out.println("Reason:");
+            e.printStackTrace();
         }
     }
 
@@ -58,20 +66,20 @@ public class GraphModel {
         queueName = channel.queueDeclare().getQueue();
         channel.queueBind(queueName, EXCHANGE_NAME, "");
 
-        System.out.println(" [*] This is GraphModel -> Thermal Exhaust Port is wide open! (this means okay)");
+        System.out.println("GraphModel: Connected to " + EXCHANGE_HOST);
 
         consumer = new DefaultConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
                 String msg = new String(body, "UTF-8");
-                System.out.println("Received: " + msg);
 
                 // Create Cluster.
                 GraphCluster cluster = parser.toGraphCluster(msg);
                 if (cluster != null) {
+                    System.out.println("GraphModel: New Cluster.\n" + cluster.getDescription());
                     GraphModel.this.addArrival(cluster);
                 } else {
-                    System.out.println("GraphModel :: Failed to add incoming cluster!");
+                    System.out.println("GraphModel: Unable to deserialize message!");
                 }
             }
         };
