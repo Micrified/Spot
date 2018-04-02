@@ -20,20 +20,28 @@ import (
 
 // Server Information.
 const (
-    DEFAULT_NET_HOST    = "localhost"
-    DEFAULT_NET_PORT    = "8024"
-    DEFAULT_NET_TYPE    = "tcp"
-    DEFAULT_BUF_SIZE    = 1024
+    DEFAULT_NET_HOST    = "localhost"       // Server IP Address.
+    DEFAULT_NET_PORT    = "8024"            // Server Port.
+    DEFAULT_NET_TYPE    = "tcp"             // Server Communication Protocol.
+    DEFAULT_BUF_SIZE    = 1024              // Server Data Buffer Size.
 )
 
 // Exchange Information
 const (
-    EXCHANGE_NET_NAME   = "test"
-    EXCHANGE_NET_PSWD   = "test"
-    EXCHANGE_NET_ADDR   = "192.168.2.2"
-    EXCHANGE_NET_PORT   = "5672"
+    EXCHANGE_NET_NAME   = "test"            // Message-Exchange Name.
+    EXCHANGE_NET_PSWD   = "test"            // Message-Exchange Password.
+    EXCHANGE_NET_ADDR   = "192.168.2.2"     // Message-Exchange IP-Address.
+    EXCHANGE_NET_PORT   = "5672"            // Message-Exchange Port.
 )
 
+// Threshold Information
+const (
+    THRESHOLD_EXPIRE    = 3000              // Cluster Lifetime (milliseconds).
+    THRESHOLD_SENSOR    = 3                 // Minimum Sensors for Event.
+    THRESHOLD_RADIUS    = 60.0              // Minimum Association Radius (meters).
+)
+
+// Server Initialization Banner.
 const init_msg = "======================== SERVER ========================\n" +
                  "Address:\t\t%s\n" +
                  "Port:\t\t\t%s\n" + 
@@ -46,22 +54,6 @@ const init_msg = "======================== SERVER ========================\n" +
                  "Time Threshold:\t\t\t%d milliseconds\n" +
                  "Sensor Threshold:\t\t%d sensors\n" +
                  "Clustering Radius:\t\t%.3f meters\n\n"
-                 
-
-/* 
- ******************************************************************************
- *                                   Globals
- ******************************************************************************
-*/
-
-// Data Gram Lifetime. 
-var Threshold_Time int
-
-// Minimum amount of sensors required to trigger an event.
-var Threshold_Sensor int
-
-// Radius of association.
-var Threshold_Radius float64
 
 /* 
  ******************************************************************************
@@ -99,10 +91,10 @@ func pruneClusters (cs []interface{}) []interface{} {
 
     for _, c := range cs {
         k := c.(data.Cluster)
-        if k.Expired(Threshold_Time) {
+        if k.Expired(THRESHOLD_EXPIRE) {
             continue
         }
-        k.Update(Threshold_Time)
+        k.Update(THRESHOLD_EXPIRE)
         survivors = append(survivors, k)
     }
 
@@ -113,7 +105,7 @@ func pruneClusters (cs []interface{}) []interface{} {
 func fitsCluster (g data.Gram, cs []interface{}) (bool, int) {
     for i, c := range cs {
         k := c.(data.Cluster)
-        if k.Suits(g, Threshold_Radius) {
+        if k.Suits(g, THRESHOLD_RADIUS) {
             return true, i
         }
     }
@@ -145,7 +137,8 @@ func requestHandler (conn net.Conn, in chan data.Gram) {
 
     var g data.Gram
     if err = json.Unmarshal(buf[:count], &g); err != nil {
-        log.Fatal("Deserialization Error: ", err.Error())
+        fmt.Printf("• RequestHandler :: Bad Message. Ignoring!")
+        return
     }
 
     // If datagram is important, send to cluster queue.
@@ -187,7 +180,7 @@ func queueHandler (in chan data.Gram, out chan data.Cluster) {
         // Send important clusters.
         for _, c := range q {
             k := c.(data.Cluster)
-            if len(k.Members) >= Threshold_Sensor {
+            if len(k.Members) >= THRESHOLD_SENSOR {
                 out <- k
             }
         }
@@ -242,7 +235,6 @@ func eventHandler (in chan data.Cluster) {
         c := <- in
 
         // Append to web-server queue.
-        fmt.Println("Sending: ", c)
         web.AddEvent(c)
 
         // Export to exchange.
@@ -271,16 +263,11 @@ func eventHandler (in chan data.Cluster) {
 
 func main () {
 
-    // Set server settings [hardcoded].
-    Threshold_Time      = 3000      // Milliseconds
-    Threshold_Sensor    = 3         // Count
-    Threshold_Radius    = 160.0      // Meters.
-
     // Display Initialization Message:
     fmt.Printf(init_msg, DEFAULT_NET_HOST, DEFAULT_NET_PORT, 
         EXCHANGE_NET_NAME, EXCHANGE_NET_PSWD, 
-        EXCHANGE_NET_ADDR, EXCHANGE_NET_PORT, Threshold_Time, 
-        Threshold_Sensor, Threshold_Radius);
+        EXCHANGE_NET_ADDR, EXCHANGE_NET_PORT, THRESHOLD_EXPIRE, 
+        THRESHOLD_SENSOR, THRESHOLD_RADIUS);
 
     // Listen for incoming connections.
     socket, err := net.Listen(DEFAULT_NET_TYPE, DEFAULT_NET_HOST + ":" + DEFAULT_NET_PORT)
